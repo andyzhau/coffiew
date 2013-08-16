@@ -1,3 +1,4 @@
 #!/bin/bash
 
-coffee -o coffiew -c src/*.coffee
+coffee -o . -c src/
+# coffee -o coffiew -c src/coffiew/*.coffee

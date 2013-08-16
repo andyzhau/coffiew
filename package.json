@@ -4,7 +4,8 @@
     "version": "0.0.1",
     "author": "Andy Zhao <andy@nodeswork.com>",
     "dependencies": {
-      "coffee-script": "*"
+      "coffee-script": "*",
+      "requirejs": "2.1.8"
     },
     "keywords": [
       "markup",
@@ -12,6 +13,7 @@
       "view",
       "coffeescript"
     ],
+    "main": "coffiew.js",
     "engines": {
       "node": "0.4.x || 0.6.x || 0.8.x || 0.10.x"
     }
