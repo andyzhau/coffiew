@@ -2,5 +2,4 @@
 #
 # Author: Andy Zhao(andy@nodeswork.com)
 
-define [], () ->
-  {}
+module.exports = {}

@@ -13,7 +13,10 @@
       "view",
       "coffeescript"
     ],
-    "main": "coffiew.js",
+    "devDependencies": {
+      "chai": "1.7.2"
+    },
+    "main": "index.js",
     "engines": {
       "node": "0.4.x || 0.6.x || 0.8.x || 0.10.x"
     }

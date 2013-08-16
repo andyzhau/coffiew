@@ -1,0 +1,4 @@
+--compilers coffee:coffee-script
+--require test/initialize/initialize.coffee
+--recursive
+--timeout 20000
