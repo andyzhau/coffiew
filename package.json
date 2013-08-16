@@ -1,0 +1,18 @@
+{
+  "name": "coffiew",
+    "description": "HTML markup from CoffeeScript.",
+    "version": "0.0.1",
+    "author": "Andy Zhao <andy@nodeswork.com>",
+    "dependencies": {
+      "coffee-script": "*"
+    },
+    "keywords": [
+      "markup",
+      "template",
+      "view",
+      "coffeescript"
+    ],
+    "engines": {
+      "node": "0.4.x || 0.6.x || 0.8.x || 0.10.x"
+    }
+}
