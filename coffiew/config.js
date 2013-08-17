@@ -4,11 +4,18 @@
 
   env = {
     isBrowser: typeof window !== "undefined" && window !== null,
-    isNode: typeof process !== "undefined" && process !== null
+    isNode: typeof process !== "undefined" && process !== null,
+    onError: function(path, options, err) {
+      console.err("coffiew render failed for " + path + " with options[" + options + "]");
+      return console.err(err.stack);
+    }
   };
 
   module.exports = config = {
-    env: env
+    env: env,
+    error: function(onError) {
+      return env.onError = onError;
+    }
   };
 
 }).call(this);
