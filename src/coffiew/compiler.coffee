@@ -20,9 +20,11 @@ __helper =
     "/": '&#x2F;'
 
   escapeHTML: (content) ->
-    content.toString().replace /[&<>"'\/]/g, (s) -> __helper.entityMap[s]
+    content?.toString().replace /[&<>"'\/]/g, (s) -> __helper.entityMap[s]
 
-  isSelfCloseTag: (tagName) -> tagName in constants.elements.void
+  closedTags: constants.elements.void.split ' '
+
+  isSelfCloseTag: (tagName) -> tagName in __helper.closedTags
 
   # Seek the renderer instance by looking the caller
   seekRenderer: (args) ->
@@ -61,14 +63,14 @@ __helper =
       return cb null, __helper.cachedTemplates[path]
     utils.loadTemplateFromPath path, (err, templateContent) ->
       if err? then return cb err
-      tpl = __helper.compile templateContent, options
+      tpl = __helper.compile templateContent, _.extend options, templatePath: path
       if options.cache then __helper.cachedTemplates[path] = tpl
       cb null, tpl
 
   compilePathSync: (path, options={}) ->
     if options.cache and __helper.cachedTemplates[path]? then return __helper.cachedTemplates[path]
     templateContent = utils.loadTemplateFromPathSync path
-    tpl = __helper.compile templateContent, options
+    tpl = __helper.compile templateContent, _.extend options, templatePath: path
     if options.cache then __helper.cachedTemplates[path] = tpl
     tpl
 
@@ -76,7 +78,7 @@ __helper =
 
 # Global functions which template could use
 defineCommand = "var #{_.keys(__helper.revTagMap()).join ','};"
-if config.env.isNode? then require('vm').runInThisContext defineCommand
+if config.env.isNode then require('vm').runInThisContext defineCommand
 else eval defineCommand
 for camelCaseKey, originKey of __helper.revTagMap()
   eval "#{camelCaseKey} = _.partial(__helper.renderTag, '#{originKey}');"
@@ -96,7 +98,7 @@ class Renderer
     @locals = _.extend {}, @options.locals
     if _.keys(@locals).length
       defineCommand = "var #{_.keys(@options.locals).join ','};"
-      if config.env.isNode? then require('vm').runInThisContext defineCommand
+      if config.env.isNode then require('vm').runInThisContext defineCommand
       else eval defineCommand
       for k, v of options
         eval "#{k} = v;"
@@ -112,8 +114,7 @@ class Renderer
   render: (data, @sections={}) ->
     # Prepare data
     @dataStack.push @_patchData data
-    renderId = "_render#{Renderer.renderId++}"
-    @sections[renderId] = []
+    @sections[renderId = @_nextRenderId()] = []
     @sectionStack.push renderId
     @extendStack.push []
 
@@ -138,13 +139,13 @@ class Renderer
     @_text "<", true
     @_text "#{tagName}"
     @_attrs attrs
-    @_text "#{inline}", attrs.safe if inline?
+    @_text " #{inline}", attrs.safe if inline?.length
 
     if __helper.isSelfCloseTag tagName
       if contents?
         contents = @_renderContent contents, attrs.safe
         if contents? then @_attrs value: contents
-      @_text ' />', true
+      @_text '>', true
     else
       @_text '>', true
       @_renderContent contents, attrs.safe
@@ -158,8 +159,6 @@ class Renderer
         previousRenderer = contents.renderer
         contents.renderer = @
         result = contents.call @data
-        if _.isString result
-          @_text result, safe
         contents.renderer = previousRenderer
         result
       else
@@ -192,33 +191,53 @@ class Renderer
     parts = path.split '/'
     parts[parts.length - 1] = '_' + parts[parts.length - 1]
     partialPath = parts.join '/'
-    if config.env.isBrowser?
+    newData = _.extend {}, @_currentData(), data
+    @_text @_loadTpl(partialPath)(newData, @sections), true
+
+  _extend: (path, data={}) ->
+    newData = _.extend {}, @_currentData(), data
+    @_currentExtend().push => @_loadTpl(path)(newData, @sections)
+
+  _loadTpl: (path) ->
+    if config.env.isBrowser
       unless __helper.cachedTemplates[path]?
         # TODO(Andy): throw more descriptive error message.
         throw new Error "#{@options.templatePath} depends on #{path}, which is missing."
-      tpl = __helper.cachedTemplates[path]
-    if config.env.isNode?
-      tpl = __helper.compilePathSync partialPath, @options
-    newData = _.extend {}, @_currentData(), data
-    @_text tpl.render(newData, @sections), data.safe
-
-  _extend: (path, data={}) ->
+      return __helper.cachedTemplates[path]
+    if config.env.isNode
+      return __helper.compilePathSync path, @options
 
   _yieldContent: (name, contents) ->
+    @_currentSection().push @sections[name] ?= []
 
   _contentFor: (name, contents) ->
+    @sections[renderId = @_nextRenderId()] = []
+    @sectionStack.push renderId
+
+    @_renderContent contents
+    (@sections[name] ?= []).unshift @sections[renderId]
+
+    delete @sections[renderId]
+    @sectionStack.pop()
 
   _text: (content, safe=false) ->
     @_currentSection().push if safe then content.toString() else __helper.escapeHTML content
 
   _generateResult: (renderId) ->
-    @extendStack[@extendStack.length - 1].join('') + _.flatten(@sections[renderId]).join('')
+    (_.map @_currentExtend(), (extend) -> extend()).join('') +
+      _.flatten(@sections[renderId]).join('')
 
   _currentData: ->
     @dataStack[@dataStack.length - 1]
 
   _currentSection: ->
     @sections[@sectionStack[@sectionStack.length - 1]]
+
+  _currentExtend: ->
+    @extendStack[@extendStack.length - 1]
+
+  _nextRenderId: ->
+    "_render#{Renderer._renderId++}"
 
   _patchData: (data) ->
     _.extend data, env: _.pick(@options, 'templatePath')
@@ -228,3 +247,5 @@ module.exports =
   compile: __helper.compile
 
   compilePath: __helper.compilePath
+
+  compilePathSync: __helper.compilePathSync

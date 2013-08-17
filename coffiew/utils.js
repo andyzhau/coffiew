@@ -25,11 +25,11 @@
     },
     loadTemplateFromPath: function(path, cb) {
       var requirejs;
-      path = "" + config.env.prefix + path + "." + config.env.extend;
+      path = "" + config.env.prefix + path + "." + config.env.extension;
       switch (false) {
-        case config.env.isNode == null:
+        case !config.env.isNode:
           return fs.readFile(path, 'utf8', cb);
-        case config.env.isBrowser == null:
+        case !config.env.isBrowser:
           requirejs = require('requirejs');
           return requirejs(["text!" + path], function(templateContent) {
             return cb(null, templateContent);
@@ -39,8 +39,8 @@
       }
     },
     loadTemplateFromPathSync: function(path) {
-      path = "" + config.env.prefix + path + "." + config.env.extend;
-      if (config.env.isNode != null) {
+      path = "" + config.env.prefix + path + "." + config.env.extension;
+      if (config.env.isNode) {
         return fs.readFileSync(path, 'utf8');
       }
       throw new Error("Current running environment doesn't support sync mode.");

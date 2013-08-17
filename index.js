@@ -14,6 +14,8 @@
 
   module.exports.compilePath = compiler.compilePath;
 
+  module.exports.compilePathSync = compiler.compilePathSync;
+
   module.exports.__express = express3;
 
 }).call(this);

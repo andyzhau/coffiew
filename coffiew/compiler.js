@@ -26,12 +26,13 @@
       "/": '&#x2F;'
     },
     escapeHTML: function(content) {
-      return content.toString().replace(/[&<>"'\/]/g, function(s) {
+      return content != null ? content.toString().replace(/[&<>"'\/]/g, function(s) {
         return __helper.entityMap[s];
-      });
+      }) : void 0;
     },
+    closedTags: constants.elements["void"].split(' '),
     isSelfCloseTag: function(tagName) {
-      return __indexOf.call(constants.elements["void"], tagName) >= 0;
+      return __indexOf.call(__helper.closedTags, tagName) >= 0;
     },
     seekRenderer: function(args) {
       var caller;
@@ -123,7 +124,9 @@
         if (err != null) {
           return cb(err);
         }
-        tpl = __helper.compile(templateContent, options);
+        tpl = __helper.compile(templateContent, _.extend(options, {
+          templatePath: path
+        }));
         if (options.cache) {
           __helper.cachedTemplates[path] = tpl;
         }
@@ -139,7 +142,9 @@
         return __helper.cachedTemplates[path];
       }
       templateContent = utils.loadTemplateFromPathSync(path);
-      tpl = __helper.compile(templateContent, options);
+      tpl = __helper.compile(templateContent, _.extend(options, {
+        templatePath: path
+      }));
       if (options.cache) {
         __helper.cachedTemplates[path] = tpl;
       }
@@ -150,7 +155,7 @@
 
   defineCommand = "var " + (_.keys(__helper.revTagMap()).join(',')) + ";";
 
-  if (config.env.isNode != null) {
+  if (config.env.isNode) {
     require('vm').runInThisContext(defineCommand);
   } else {
     eval(defineCommand);
@@ -200,7 +205,7 @@
       this.locals = _.extend({}, this.options.locals);
       if (_.keys(this.locals).length) {
         defineCommand = "var " + (_.keys(this.options.locals).join(',')) + ";";
-        if (config.env.isNode != null) {
+        if (config.env.isNode) {
           require('vm').runInThisContext(defineCommand);
         } else {
           eval(defineCommand);
@@ -220,8 +225,7 @@
       var htmlResult, previousRenderer, renderId;
       this.sections = sections != null ? sections : {};
       this.dataStack.push(this._patchData(data));
-      renderId = "_render" + (Renderer.renderId++);
-      this.sections[renderId] = [];
+      this.sections[renderId = this._nextRenderId()] = [];
       this.sectionStack.push(renderId);
       this.extendStack.push([]);
       previousRenderer = this.template.renderer;
@@ -243,8 +247,8 @@
       this._text("<", true);
       this._text("" + tagName);
       this._attrs(attrs);
-      if (inline != null) {
-        this._text("" + inline, attrs.safe);
+      if (inline != null ? inline.length : void 0) {
+        this._text(" " + inline, attrs.safe);
       }
       if (__helper.isSelfCloseTag(tagName)) {
         if (contents != null) {
@@ -255,7 +259,7 @@
             });
           }
         }
-        return this._text(' />', true);
+        return this._text('>', true);
       } else {
         this._text('>', true);
         this._renderContent(contents, attrs.safe);
@@ -275,9 +279,6 @@
           previousRenderer = contents.renderer;
           contents.renderer = this;
           result = contents.call(this.data);
-          if (_.isString(result)) {
-            this._text(result, safe);
-          }
           contents.renderer = previousRenderer;
           return result;
         default:
@@ -343,35 +344,55 @@
     };
 
     Renderer.prototype._partial = function(path, data) {
-      var newData, partialPath, parts, tpl;
+      var newData, partialPath, parts;
       if (data == null) {
         data = {};
       }
       parts = path.split('/');
       parts[parts.length - 1] = '_' + parts[parts.length - 1];
       partialPath = parts.join('/');
-      if (config.env.isBrowser != null) {
-        if (__helper.cachedTemplates[path] == null) {
-          throw new Error("" + this.options.templatePath + " depends on " + path + ", which is missing.");
-        }
-        tpl = __helper.cachedTemplates[path];
-      }
-      if (config.env.isNode != null) {
-        tpl = __helper.compilePathSync(partialPath, this.options);
-      }
       newData = _.extend({}, this._currentData(), data);
-      return this._text(tpl.render(newData, this.sections), data.safe);
+      return this._text(this._loadTpl(partialPath)(newData, this.sections), true);
     };
 
     Renderer.prototype._extend = function(path, data) {
+      var newData,
+        _this = this;
       if (data == null) {
         data = {};
       }
+      newData = _.extend({}, this._currentData(), data);
+      return this._currentExtend().push(function() {
+        return _this._loadTpl(path)(newData, _this.sections);
+      });
     };
 
-    Renderer.prototype._yieldContent = function(name, contents) {};
+    Renderer.prototype._loadTpl = function(path) {
+      if (config.env.isBrowser) {
+        if (__helper.cachedTemplates[path] == null) {
+          throw new Error("" + this.options.templatePath + " depends on " + path + ", which is missing.");
+        }
+        return __helper.cachedTemplates[path];
+      }
+      if (config.env.isNode) {
+        return __helper.compilePathSync(path, this.options);
+      }
+    };
 
-    Renderer.prototype._contentFor = function(name, contents) {};
+    Renderer.prototype._yieldContent = function(name, contents) {
+      var _base;
+      return this._currentSection().push((_base = this.sections)[name] != null ? (_base = this.sections)[name] : _base[name] = []);
+    };
+
+    Renderer.prototype._contentFor = function(name, contents) {
+      var renderId, _base;
+      this.sections[renderId = this._nextRenderId()] = [];
+      this.sectionStack.push(renderId);
+      this._renderContent(contents);
+      ((_base = this.sections)[name] != null ? (_base = this.sections)[name] : _base[name] = []).unshift(this.sections[renderId]);
+      delete this.sections[renderId];
+      return this.sectionStack.pop();
+    };
 
     Renderer.prototype._text = function(content, safe) {
       if (safe == null) {
@@ -381,7 +402,9 @@
     };
 
     Renderer.prototype._generateResult = function(renderId) {
-      return this.extendStack[this.extendStack.length - 1].join('') + _.flatten(this.sections[renderId]).join('');
+      return (_.map(this._currentExtend(), function(extend) {
+        return extend();
+      })).join('') + _.flatten(this.sections[renderId]).join('');
     };
 
     Renderer.prototype._currentData = function() {
@@ -390,6 +413,14 @@
 
     Renderer.prototype._currentSection = function() {
       return this.sections[this.sectionStack[this.sectionStack.length - 1]];
+    };
+
+    Renderer.prototype._currentExtend = function() {
+      return this.extendStack[this.extendStack.length - 1];
+    };
+
+    Renderer.prototype._nextRenderId = function() {
+      return "_render" + (Renderer._renderId++);
     };
 
     Renderer.prototype._patchData = function(data) {
@@ -404,7 +435,8 @@
 
   module.exports = {
     compile: __helper.compile,
-    compilePath: __helper.compilePath
+    compilePath: __helper.compilePath,
+    compilePathSync: __helper.compilePathSync
   };
 
 }).call(this);

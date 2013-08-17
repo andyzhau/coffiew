@@ -1,6 +1,8 @@
 # Configuration of coffiew.
 # Author: Andy Zhao(andy@nodeswork.com)
 
+_ = require 'underscore'
+
 env =
   isBrowser: window?
   isNode: process?

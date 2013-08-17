@@ -1,0 +1,5 @@
+text 'before partial'
+br()
+partial 'menu', hello: 'world'
+br()
+text 'after partial'

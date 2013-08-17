@@ -1,0 +1,7 @@
+doctype 5
+html ->
+  head ->
+    meta
+  body ->
+    div '#id.class-1.class-2', ->
+      select 'selected', ->
