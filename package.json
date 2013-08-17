@@ -5,7 +5,8 @@
     "author": "Andy Zhao <andy@nodeswork.com>",
     "dependencies": {
       "coffee-script": "*",
-      "requirejs": "2.1.8"
+      "requirejs": "2.1.8",
+      "underscore": "*"
     },
     "keywords": [
       "markup",
