@@ -3,8 +3,11 @@
 # Author: Andy Zhao(andy@nodeswork.com)
 
 _ = require 'underscore'
-config = require './config'
+changeCase = require 'change-case'
 coffeescript = require 'coffee-script'
+config = require './config'
+constants = require './constants'
+utils = require './utils'
 
 __helper =
 
@@ -19,7 +22,7 @@ __helper =
   escapeHTML: (content) ->
     content.toString().replace /[&<>"'\/]/g, (s) -> __helper.entityMap[s]
 
-  isSelfCloseTag: (tagName) -> no
+  isSelfCloseTag: (tagName) -> tagName in constants.elements.void
 
   # Seek the renderer instance by looking the caller
   seekRenderer: (args) ->
@@ -43,8 +46,45 @@ __helper =
         else contents = arg
     renderer._renderTag tagName, attrs, inline, contents
 
+  allTags: utils.mergeElements.apply null, _.values constants.elements
+
+  revTagMap: _.memoize () ->
+    _.object([changeCase.camelCase(tag), tag] for tag in __helper.allTags)
+
+  compile: (templateContent, options={}) ->
+    tpl = new Renderer coffeescript.compile(templateContent, bare: yes), options
+    (data={}, sections={}) -> tpl.render data, sections
+
+  compilePath: (path, options..., cb) ->
+    options = options[0] || {}
+    if options.cache and __helper.cachedTemplates[path]?
+      return cb null, __helper.cachedTemplates[path]
+    utils.loadTemplateFromPath path, (err, templateContent) ->
+      if err? then return cb err
+      tpl = __helper.compile templateContent, options
+      if options.cache then __helper.cachedTemplates[path] = tpl
+      cb null, tpl
+
+  compilePathSync: (path, options={}) ->
+    if options.cache and __helper.cachedTemplates[path]? then return __helper.cachedTemplates[path]
+    templateContent = utils.loadTemplateFromPathSync path
+    tpl = __helper.compile templateContent, options
+    if options.cache then __helper.cachedTemplates[path] = tpl
+    tpl
+
+  cachedTemplates: {}
+
 # Global functions which template could use
-div = () -> __helper.renderTag.apply null, ['div'].concat(Array.prototype.slice.call(arguments))
+defineCommand = "var #{_.keys(__helper.revTagMap()).join ','};"
+if config.env.isNode? then require('vm').runInThisContext defineCommand
+else eval defineCommand
+for camelCaseKey, originKey of __helper.revTagMap()
+  eval "#{camelCaseKey} = _.partial(__helper.renderTag, '#{originKey}');"
+doctype = (type='default') -> __helper.seekRenderer(arguments)._doctype type
+partial = (path, data={}) -> __helper.seekRenderer(arguments)._partial path, data
+extend = (path, data={}) -> __helper.seekRenderer(arguments)._extend path, data
+yieldContent = (name, contents) -> __helper.seekRenderer(arguments)._yieldContent name, contents
+contentFor = (name, contents) -> __helper.seekRenderer(arguments)._contentFor name, contents
 
 class Renderer
 
@@ -145,6 +185,29 @@ class Renderer
         when attr is 'safe'
         else attrReady attr, val
 
+  _doctype: (type='default') ->
+    @_text constants.doctypes[type], true
+
+  _partial: (path, data={}) ->
+    parts = path.split '/'
+    parts[parts.length - 1] = '_' + parts[parts.length - 1]
+    partialPath = parts.join '/'
+    if config.env.isBrowser?
+      unless __helper.cachedTemplates[path]?
+        # TODO(Andy): throw more descriptive error message.
+        throw new Error "#{@options.templatePath} depends on #{path}, which is missing."
+      tpl = __helper.cachedTemplates[path]
+    if config.env.isNode?
+      tpl = __helper.compilePathSync partialPath, @options
+    newData = _.extend {}, @_currentData(), data
+    @_text tpl.render(newData, @sections), data.safe
+
+  _extend: (path, data={}) ->
+
+  _yieldContent: (name, contents) ->
+
+  _contentFor: (name, contents) ->
+
   _text: (content, safe=false) ->
     @_currentSection().push if safe then content.toString() else __helper.escapeHTML content
 
@@ -161,8 +224,7 @@ class Renderer
     _.extend data, env: _.pick(@options, 'templatePath')
 
 module.exports =
-  compile: (template, options={}) ->
-    tpl = new Renderer coffeescript.compile(template, bare: yes), options
-    (data={}, sections={}) -> tpl.render data, sections
 
-  compilePath: {}
+  compile: __helper.compile
+
+  compilePath: __helper.compilePath

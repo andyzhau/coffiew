@@ -4,6 +4,7 @@
     "version": "0.0.1",
     "author": "Andy Zhao <andy@nodeswork.com>",
     "dependencies": {
+      "change-case": "0.0.4",
       "coffee-script": "*",
       "requirejs": "2.1.8",
       "underscore": "*"

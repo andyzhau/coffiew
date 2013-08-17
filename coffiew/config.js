@@ -8,13 +8,15 @@
     onError: function(path, options, err) {
       console.err("coffiew render failed for " + path + " with options[" + options + "]");
       return console.err(err.stack);
-    }
+    },
+    extension: 'coffiew',
+    prefix: ''
   };
 
   module.exports = config = {
     env: env,
-    error: function(onError) {
-      return env.onError = onError;
+    extend: function(configs) {
+      return _.extend(env, configs);
     }
   };
 

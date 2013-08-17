@@ -7,10 +7,11 @@ env =
   onError: (path, options, err) ->
     console.err "coffiew renders failed for #{path} with options[#{options}]"
     console.err err.stack
+  extension: 'coffiew'
+  prefix: ''
 
 module.exports = config =
 
   env: env
 
-  error: (onError) ->
-    env.onError = onError
+  extend: (configs) -> _.extend env, configs
