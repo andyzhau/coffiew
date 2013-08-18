@@ -41,3 +41,9 @@ describe 'Coffiew', ->
             goldenContent = fs.readFileSync output, 'utf8'
             goldenContent = goldenContent.substring 0, goldenContent.length - 1
             coffiew.compilePathSync(path.basename file, '.coffiew')().should.eql goldenContent
+
+  describe 'utils', ->
+
+    it 'merges correct elements', ->
+      coffiew.utils.mergeElements('a b c d e', 'd e f g h').should.eql(
+          ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
