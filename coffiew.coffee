@@ -5,7 +5,7 @@ _ = require 'underscore'
 changeCase = require 'change-case'
 coffeescript = require 'coffee-script'
 
-coffiew ?= {}
+coffiew = {}
 
 ###############################################
 #
@@ -55,7 +55,7 @@ coffiew.utils = utils =
       when 1 then args[0]
       else
         path1 = utils.join.apply null, args.slice 0, args.length - 1
-        if path1[path1.length- 1】isnt '/' then path1 += '/'
+        if path1[path1.length - 1] isnt '/' then path1 += '/'
         path2 = args[args.length - 1]
         if path2[0] isnt '/' then path1 + path2 else path2
 
@@ -65,14 +65,13 @@ coffiew.utils = utils =
   getFullPath: (templatePath) ->
     if utils.extname(templatePath) isnt env.extension
       templatePath += env.extension
-    if templatePath[0] isnt '/' then utils.join env.prefix, templatePath
-    else templatePath
+    utils.join env.prefix, templatePath
 
   loadTemplateFromPath: (path, cb) ->
     path = utils.getFullPath path
     switch
       when env.isNode then require('fs').readFile path, 'utf-8', cb
-      when config.env.isBrowser
+      when env.isBrowser
         requirejs = require 'requirejs'
         requirejs ["text!#{path}"], (templateContent) -> cb null, templateContent
       else cb 'unknown working environment.'
@@ -215,7 +214,7 @@ __helper =
 
 # Global functions which template could use
 defineCommand = "var #{_.keys(__helper.revTagMap()).join ','};"
-if config.env.isNode then require('vm').runInThisContext defineCommand
+if env.isNode then require('vm').runInThisContext defineCommand
 else eval defineCommand
 for camelCaseKey, originKey of __helper.revTagMap()
   eval "#{camelCaseKey} = _.partial(__helper.renderTag, '#{originKey}');"
@@ -235,7 +234,7 @@ class Renderer
     @locals = _.extend {}, @options.locals
     if _.keys(@locals).length
       defineCommand = "var #{_.keys(@options.locals).join ','};"
-      if config.env.isNode then require('vm').runInThisContext defineCommand
+      if env.isNode then require('vm').runInThisContext defineCommand
       else eval defineCommand
       for k, v of options
         eval "#{k} = v;"
@@ -336,12 +335,12 @@ class Renderer
     @_currentExtend().push => @_loadTpl(path)(newData, @sections)
 
   _loadTpl: (path) ->
-    if config.env.isBrowser
+    if env.isBrowser
       unless __helper.cachedTemplates[path]?
         # TODO(Andy): throw more descriptive error message.
         throw new Error "#{@options.templatePath} depends on #{path}, which is missing."
       return __helper.cachedTemplates[path]
-    if config.env.isNode
+    if env.isNode
       return __helper.compilePathSync path, @options
 
   _yieldContent: (name, contents) ->
@@ -384,4 +383,13 @@ class Renderer
 # Exports.
 #
 ###############################################
-_.extend module.exports, coffiew
+_.extend module.exports, coffiew,
+  _.pick(__helper, 'compile', 'compilePath', 'compilePathSync')
+
+if env.isNode then module.exports.__express = (path, options, fn) ->
+  try
+    tpl = __helper.compilePathSync path, options
+    fn null, tpl options
+  catch err
+    env.onError path, options, err
+    fn err
