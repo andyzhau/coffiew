@@ -72,7 +72,6 @@ coffiew.utils = utils =
     switch
       when env.isNode then require('fs').readFile path, 'utf-8', cb
       when env.isBrowser
-        requirejs = require 'requirejs'
         requirejs ["text!#{path}"], (templateContent) -> cb null, templateContent
       else cb 'unknown working environment.'
 
@@ -383,6 +382,8 @@ class Renderer
 # Exports.
 #
 ###############################################
+window?.module ?= {}
+module?.exports ?= {}
 _.extend module.exports, coffiew,
   _.pick(__helper, 'compile', 'compilePath', 'compilePathSync')
 
@@ -393,3 +394,5 @@ if env.isNode then module.exports.__express = (path, options, fn) ->
   catch err
     env.onError path, options, err
     fn err
+
+window?.coffiew ?= module.exports

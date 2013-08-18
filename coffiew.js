@@ -78,13 +78,11 @@
       return utils.join(env.prefix, templatePath);
     },
     loadTemplateFromPath: function(path, cb) {
-      var requirejs;
       path = utils.getFullPath(path);
       switch (false) {
         case !env.isNode:
           return require('fs').readFile(path, 'utf-8', cb);
         case !env.isBrowser:
-          requirejs = require('requirejs');
           return requirejs(["text!" + path], function(templateContent) {
             return cb(null, templateContent);
           });
@@ -559,6 +557,18 @@
 
   })();
 
+  if (typeof window !== "undefined" && window !== null) {
+    if (window.module == null) {
+      window.module = {};
+    }
+  }
+
+  if (typeof module !== "undefined" && module !== null) {
+    if (module.exports == null) {
+      module.exports = {};
+    }
+  }
+
   _.extend(module.exports, coffiew, _.pick(__helper, 'compile', 'compilePath', 'compilePathSync'));
 
   if (env.isNode) {
@@ -573,6 +583,12 @@
         return fn(err);
       }
     };
+  }
+
+  if (typeof window !== "undefined" && window !== null) {
+    if (window.coffiew == null) {
+      window.coffiew = module.exports;
+    }
   }
 
 }).call(this);
