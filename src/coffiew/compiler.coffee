@@ -158,7 +158,7 @@ class Renderer
       when _.isFunction contents
         previousRenderer = contents.renderer
         contents.renderer = @
-        result = contents.call @data
+        result = contents.call @_currentData()
         contents.renderer = previousRenderer
         result
       else

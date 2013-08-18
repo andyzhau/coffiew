@@ -7,9 +7,9 @@ env =
   isBrowser: window?
   isNode: process?
   onError: (path, options, err) ->
-    console.err "coffiew renders failed for #{path} with options[#{options}]"
-    console.err err.stack
-  extension: 'coffiew'
+    console.error "coffiew renders failed for #{path} with options[#{options}]"
+    console.error err.stack
+  extension: '.coffiew'
   prefix: ''
 
 module.exports = config =

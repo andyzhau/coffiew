@@ -278,7 +278,7 @@
         case !_.isFunction(contents):
           previousRenderer = contents.renderer;
           contents.renderer = this;
-          result = contents.call(this.data);
+          result = contents.call(this._currentData());
           contents.renderer = previousRenderer;
           return result;
         default:

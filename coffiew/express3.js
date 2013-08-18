@@ -9,11 +9,11 @@
   module.exports = function(path, options, fn) {
     var err, tpl;
     try {
-      tpl = compiler.compilePath(path, options);
+      tpl = compiler.compilePathSync(path, options);
       return fn(null, tpl(options));
     } catch (_error) {
       err = _error;
-      config.onError(path, options, err);
+      config.env.onError(path, options, err);
       return fn(err);
     }
   };

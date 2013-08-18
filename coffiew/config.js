@@ -8,10 +8,10 @@
     isBrowser: typeof window !== "undefined" && window !== null,
     isNode: typeof process !== "undefined" && process !== null,
     onError: function(path, options, err) {
-      console.err("coffiew render failed for " + path + " with options[" + options + "]");
-      return console.err(err.stack);
+      console.error("coffiew renders failed for " + path + " with options[" + options + "]");
+      return console.error(err.stack);
     },
-    extension: 'coffiew',
+    extension: '.coffiew',
     prefix: ''
   };
 
