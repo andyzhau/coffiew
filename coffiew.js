@@ -519,7 +519,7 @@
               return "" + (changeCase.paramCase(k)) + ":" + (v.toString());
             });
             if (items.length) {
-              _results.push(attrReady("style=\"" + (items.join(';')) + "\""));
+              _results.push(attrReady('style', items.join(';')));
             } else {
               _results.push(void 0);
             }
