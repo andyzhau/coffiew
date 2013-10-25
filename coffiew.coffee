@@ -78,7 +78,8 @@ coffiew.utils = utils =
   loadTemplateFromPathSync: (path) ->
     path = utils.getFullPath path
     if env.isNode then return require('fs').readFileSync path, 'utf-8'
-    throw new Error "Current running environment doesn't support sync mode."
+    throw new Error "Current running environment doesn't support sync mode,
+ try to call ensureLoadTemplate(s) on #{path} first"
 
   passError: (cb, func) ->
     (err, args...) -> if err? then cb err else func.apply @, args
@@ -164,11 +165,13 @@ __helper =
 
   isSelfCloseTag: (tagName) -> tagName in __helper.closedTags
 
+  __lastRenderer: null
+
   # Seek the renderer instance by looking the caller
   seekRenderer: (args) ->
     caller = args.callee
-    caller = caller.caller until caller.renderer?
-    caller.renderer
+    caller = caller.caller until not caller? or caller.renderer?
+    __helper.__lastRenderer = caller?.renderer ? __helper.__lastRenderer
 
   renderTag: (tagName, args...) ->
     renderer = __helper.seekRenderer arguments
@@ -331,12 +334,18 @@ class Renderer
       switch
         when val is true then attrReady attr, attr  # selected="selected"
         when _.isFunction val then attrReady attr, "(#{val}).call(this);"  # bind events.
-        # TODO(Andy): supports json data for styles.
         when attr is 'data'
           for k, v of val
             attrReady "data-#{k}", v
         when attr is 'classes'
           if val.length then attrReady 'class', val.join ' '
+        when attr is 'selected'
+          if val then attrReady 'selected', 'selected'
+        when attr is 'checked'
+          if val then attrReady 'checked', 'checked'
+        when attr is 'style' and _.isObject val
+          items = _.map val, (v, k) -> "#{changeCase.paramCase(k)}=\"#{v.toString()}\""
+          if items.length then attrReady "style=#{items.join(';')}"
         when attr is 'safe'
         else attrReady attr, val
 

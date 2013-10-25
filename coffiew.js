@@ -95,7 +95,7 @@
       if (env.isNode) {
         return require('fs').readFileSync(path, 'utf-8');
       }
-      throw new Error("Current running environment doesn't support sync mode.");
+      throw new Error("Current running environment doesn't support sync mode, try to call ensureLoadTemplate(s) on " + path + " first");
     },
     passError: function(cb, func) {
       return function() {
@@ -169,13 +169,14 @@
     isSelfCloseTag: function(tagName) {
       return __indexOf.call(__helper.closedTags, tagName) >= 0;
     },
+    __lastRenderer: null,
     seekRenderer: function(args) {
-      var caller;
+      var caller, _ref;
       caller = args.callee;
-      while (caller.renderer == null) {
+      while (!((caller == null) || (caller.renderer != null))) {
         caller = caller.caller;
       }
-      return caller.renderer;
+      return __helper.__lastRenderer = (_ref = caller != null ? caller.renderer : void 0) != null ? _ref : __helper.__lastRenderer;
     },
     renderTag: function() {
       var arg, args, attrs, contents, i, inline, renderer, tagName, _i, _len;
@@ -460,7 +461,7 @@
     };
 
     Renderer.prototype._attrs = function(attrs, safe) {
-      var attr, attrReady, k, v, val, _results,
+      var attr, attrReady, items, k, v, val, _results,
         _this = this;
       if (safe == null) {
         safe = false;
@@ -495,6 +496,30 @@
           case attr !== 'classes':
             if (val.length) {
               _results.push(attrReady('class', val.join(' ')));
+            } else {
+              _results.push(void 0);
+            }
+            break;
+          case attr !== 'selected':
+            if (val) {
+              _results.push(attrReady('selected', 'selected'));
+            } else {
+              _results.push(void 0);
+            }
+            break;
+          case attr !== 'checked':
+            if (val) {
+              _results.push(attrReady('checked', 'checked'));
+            } else {
+              _results.push(void 0);
+            }
+            break;
+          case !(attr === 'style' && _.isObject(val)):
+            items = _.map(val, function(v, k) {
+              return "" + (changeCase.paramCase(k)) + "=\"" + (v.toString()) + "\"";
+            });
+            if (items.length) {
+              _results.push(attrReady("style=" + (items.join(';'))));
             } else {
               _results.push(void 0);
             }
