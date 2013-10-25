@@ -344,8 +344,8 @@ class Renderer
         when attr is 'checked'
           if val then attrReady 'checked', 'checked'
         when attr is 'style' and _.isObject val
-          items = _.map val, (v, k) -> "#{changeCase.paramCase(k)}=\"#{v.toString()}\""
-          if items.length then attrReady "style=#{items.join(';')}"
+          items = _.map val, (v, k) -> "#{changeCase.paramCase(k)}:#{v.toString()}"
+          if items.length then attrReady "style=\"#{items.join(';')}\""
         when attr is 'safe'
         else attrReady attr, val
 
