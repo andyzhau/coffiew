@@ -80,6 +80,9 @@ coffiew.utils = utils =
     if env.isNode then return require('fs').readFileSync path, 'utf-8'
     throw new Error "Current running environment doesn't support sync mode."
 
+  passError: (cb, func) ->
+    (err, args...) -> if err? then cb err else func.apply @, args
+
 ###############################################
 #
 # Constants
@@ -194,20 +197,38 @@ __helper =
 
   compilePath: (path, options..., cb) ->
     options = options[0] || {}
+    if env.isBrowser then options.cache ?= true
     if options.cache and __helper.cachedTemplates[path]?
       return cb null, __helper.cachedTemplates[path]
-    utils.loadTemplateFromPath path, (err, templateContent) ->
-      if err? then return cb err
+    utils.loadTemplateFromPath path, utils.passError cb, (templateContent) ->
       tpl = __helper.compile templateContent, _.extend options, templatePath: path
       if options.cache then __helper.cachedTemplates[path] = tpl
       cb null, tpl
 
   compilePathSync: (path, options={}) ->
+    if env.isBrowser then options.cache ?= true
     if options.cache and __helper.cachedTemplates[path]? then return __helper.cachedTemplates[path]
     templateContent = utils.loadTemplateFromPathSync path
     tpl = __helper.compile templateContent, _.extend options, templatePath: path
     if options.cache then __helper.cachedTemplates[path] = tpl
     tpl
+
+  ensureLoadTemplates: (templatePaths, cb) ->
+    unless templatePaths.length then return cb()
+    afterCb = _.after templatePaths.length, cb
+    templates = []
+    err = null
+    for templatePath in templatePaths
+      __helper.ensureLoadTemplate templatePath, (e, tpl) ->
+        templates.push tpl
+        afterCb err ?= e, templates
+
+  ensureLoadTemplate: (templatePath, cb) ->
+    __helper.compilePath templatePath, cache: true, utils.passError cb, (tpl) ->
+      cb tpl
+
+  render: (templatePath, data) ->
+    __helper.compilePathSync(templatePath, cache: true)(data)
 
   cachedTemplates: {}
 
@@ -382,11 +403,18 @@ class Renderer
 # Exports.
 #
 ###############################################
+
+# Initialize module.exports to window
 window?.module ?= {}
 module?.exports ?= {}
-_.extend module.exports, coffiew,
-  _.pick(__helper, 'compile', 'compilePath', 'compilePathSync')
+window?.coffiew ?= module.exports
 
+# Export compile, compilePath, compilePathSync
+_.extend module.exports, coffiew,
+  _.pick(__helper, 'compile', 'compilePath', 'compilePathSync', 'ensureLoadTemplate',
+    'ensureLoadTemplates', 'render')
+
+# Export express3 plugin for node.js
 if env.isNode then module.exports.__express = (path, options, fn) ->
   try
     tpl = __helper.compilePathSync path, options
@@ -394,5 +422,3 @@ if env.isNode then module.exports.__express = (path, options, fn) ->
   catch err
     env.onError path, options, err
     fn err
-
-window?.coffiew ?= module.exports

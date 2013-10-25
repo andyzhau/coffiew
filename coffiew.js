@@ -96,6 +96,17 @@
         return require('fs').readFileSync(path, 'utf-8');
       }
       throw new Error("Current running environment doesn't support sync mode.");
+    },
+    passError: function(cb, func) {
+      return function() {
+        var args, err;
+        err = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+        if (err != null) {
+          return cb(err);
+        } else {
+          return func.apply(this, args);
+        }
+      };
     }
   };
 
@@ -240,14 +251,16 @@
       var cb, options, path, _i;
       path = arguments[0], options = 3 <= arguments.length ? __slice.call(arguments, 1, _i = arguments.length - 1) : (_i = 1, []), cb = arguments[_i++];
       options = options[0] || {};
+      if (env.isBrowser) {
+        if (options.cache == null) {
+          options.cache = true;
+        }
+      }
       if (options.cache && (__helper.cachedTemplates[path] != null)) {
         return cb(null, __helper.cachedTemplates[path]);
       }
-      return utils.loadTemplateFromPath(path, function(err, templateContent) {
+      return utils.loadTemplateFromPath(path, utils.passError(cb, function(templateContent) {
         var tpl;
-        if (err != null) {
-          return cb(err);
-        }
         tpl = __helper.compile(templateContent, _.extend(options, {
           templatePath: path
         }));
@@ -255,12 +268,17 @@
           __helper.cachedTemplates[path] = tpl;
         }
         return cb(null, tpl);
-      });
+      }));
     },
     compilePathSync: function(path, options) {
       var templateContent, tpl;
       if (options == null) {
         options = {};
+      }
+      if (env.isBrowser) {
+        if (options.cache == null) {
+          options.cache = true;
+        }
       }
       if (options.cache && (__helper.cachedTemplates[path] != null)) {
         return __helper.cachedTemplates[path];
@@ -273,6 +291,36 @@
         __helper.cachedTemplates[path] = tpl;
       }
       return tpl;
+    },
+    ensureLoadTemplates: function(templatePaths, cb) {
+      var afterCb, err, templatePath, templates, _i, _len, _results;
+      if (!templatePaths.length) {
+        return cb();
+      }
+      afterCb = _.after(templatePaths.length, cb);
+      templates = [];
+      err = null;
+      _results = [];
+      for (_i = 0, _len = templatePaths.length; _i < _len; _i++) {
+        templatePath = templatePaths[_i];
+        _results.push(__helper.ensureLoadTemplate(templatePath, function(e, tpl) {
+          templates.push(tpl);
+          return afterCb(err != null ? err : err = e, templates);
+        }));
+      }
+      return _results;
+    },
+    ensureLoadTemplate: function(templatePath, cb) {
+      return __helper.compilePath(templatePath, {
+        cache: true
+      }, utils.passError(cb, function(tpl) {
+        return cb(tpl);
+      }));
+    },
+    render: function(templatePath, data) {
+      return __helper.compilePathSync(templatePath, {
+        cache: true
+      })(data);
     },
     cachedTemplates: {}
   };
@@ -569,7 +617,13 @@
     }
   }
 
-  _.extend(module.exports, coffiew, _.pick(__helper, 'compile', 'compilePath', 'compilePathSync'));
+  if (typeof window !== "undefined" && window !== null) {
+    if (window.coffiew == null) {
+      window.coffiew = module.exports;
+    }
+  }
+
+  _.extend(module.exports, coffiew, _.pick(__helper, 'compile', 'compilePath', 'compilePathSync', 'ensureLoadTemplate', 'ensureLoadTemplates', 'render'));
 
   if (env.isNode) {
     module.exports.__express = function(path, options, fn) {
@@ -583,12 +637,6 @@
         return fn(err);
       }
     };
-  }
-
-  if (typeof window !== "undefined" && window !== null) {
-    if (window.coffiew == null) {
-      window.coffiew = module.exports;
-    }
   }
 
 }).call(this);
