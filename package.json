@@ -23,5 +23,9 @@
     "main": "coffiew.js",
     "engines": {
       "node": "0.4.x || 0.6.x || 0.8.x || 0.10.x"
+    },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/nodeswork/coffiew"
     }
 }
