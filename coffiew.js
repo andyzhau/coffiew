@@ -261,14 +261,24 @@
         return cb(null, __helper.cachedTemplates[path]);
       }
       return utils.loadTemplateFromPath(path, utils.passError(cb, function(templateContent) {
-        var tpl;
+        var deps, tpl;
         tpl = __helper.compile(templateContent, _.extend(options, {
           templatePath: path
         }));
         if (options.cache) {
           __helper.cachedTemplates[path] = tpl;
         }
-        return cb(null, tpl);
+        if (options.chain) {
+          deps = [];
+          templateContent.replace(/(extend|partial)\s+'([\w\d\/_-]+)'/g, function(match, op, fp) {
+            return deps.push(op === 'extend' ? fp : __helper.partialPath(fp));
+          });
+          return __helper.ensureLoadTemplates(deps, function() {
+            return cb(null, tpl);
+          });
+        } else {
+          return cb(null, tpl);
+        }
       }));
     },
     compilePathSync: function(path, options) {
@@ -313,7 +323,8 @@
     },
     ensureLoadTemplate: function(templatePath, cb) {
       return __helper.compilePath(templatePath, {
-        cache: true
+        cache: true,
+        chain: true
       }, utils.passError(cb, function(tpl) {
         return cb(tpl);
       }));
@@ -323,7 +334,13 @@
         cache: true
       })(data);
     },
-    cachedTemplates: {}
+    cachedTemplates: {},
+    partialPath: function(path) {
+      var parts;
+      parts = path.split('/');
+      parts[parts.length - 1] = '_' + parts[parts.length - 1];
+      return parts.join('/');
+    }
   };
 
   defineCommand = "var " + (_.keys(__helper.revTagMap()).join(',')) + ";";
@@ -541,15 +558,12 @@
     };
 
     Renderer.prototype._partial = function(path, data) {
-      var newData, partialPath, parts;
+      var newData;
       if (data == null) {
         data = {};
       }
-      parts = path.split('/');
-      parts[parts.length - 1] = '_' + parts[parts.length - 1];
-      partialPath = parts.join('/');
       newData = _.extend({}, this._currentData(), data);
-      return this._text(this._loadTpl(partialPath)(newData, this.sections), true);
+      return this._text(this._loadTpl(__helper.partialPath(path))(newData, this.sections), true);
     };
 
     Renderer.prototype._extend = function(path, data) {

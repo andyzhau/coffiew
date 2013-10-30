@@ -206,7 +206,13 @@ __helper =
     utils.loadTemplateFromPath path, utils.passError cb, (templateContent) ->
       tpl = __helper.compile templateContent, _.extend options, templatePath: path
       if options.cache then __helper.cachedTemplates[path] = tpl
-      cb null, tpl
+      if options.chain
+        deps = []
+        templateContent.replace /(extend|partial)\s+'([\w\d\/_-]+)'/g, (match, op, fp) ->
+          deps.push if op is 'extend' then fp else __helper.partialPath(fp)
+        __helper.ensureLoadTemplates deps, -> cb null, tpl
+      else
+        cb null, tpl
 
   compilePathSync: (path, options={}) ->
     if env.isBrowser then options.cache ?= true
@@ -227,13 +233,18 @@ __helper =
         afterCb err ?= e, templates
 
   ensureLoadTemplate: (templatePath, cb) ->
-    __helper.compilePath templatePath, cache: true, utils.passError cb, (tpl) ->
+    __helper.compilePath templatePath, cache: true, chain: true, utils.passError cb, (tpl) ->
       cb tpl
 
   render: (templatePath, data) ->
     __helper.compilePathSync(templatePath, cache: true)(data)
 
   cachedTemplates: {}
+
+  partialPath: (path) ->
+    parts = path.split '/'
+    parts[parts.length - 1] = '_' + parts[parts.length - 1]
+    parts.join '/'
 
 # Global functions which template could use
 defineCommand = "var #{_.keys(__helper.revTagMap()).join ','};"
@@ -353,11 +364,8 @@ class Renderer
     @_text constants.doctypes[type], true
 
   _partial: (path, data={}) ->
-    parts = path.split '/'
-    parts[parts.length - 1] = '_' + parts[parts.length - 1]
-    partialPath = parts.join '/'
     newData = _.extend {}, @_currentData(), data
-    @_text @_loadTpl(partialPath)(newData, @sections), true
+    @_text @_loadTpl(__helper.partialPath path)(newData, @sections), true
 
   _extend: (path, data={}) ->
     newData = _.extend {}, @_currentData(), data

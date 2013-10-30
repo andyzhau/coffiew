@@ -1,7 +1,7 @@
 {
   "name": "coffiew",
     "description": "HTML markup written in CoffeeScript.",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "author": "Andy Zhao <andy@nodeswork.com>",
     "dependencies": {
       "change-case": "0.0.4",
